@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5 ночей с Лисом</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
+  html,body { width:100%; height:100%; background:#000; font-family:'Courier New',monospace; overflow:hidden; }
+  #app { position:relative; width:100vw; height:100vh; background:#000; color:#eee; }
+  .screen { position:absolute; inset:0; display:none; }
+  .screen.active { display:flex; flex-direction:column; align-items:center; justify-content:center; }
+
+  /* ---- Menu ---- */
+  #menu { background:radial-gradient(ellipse at center, #1a0000 0%, #000 80%); }
+  #menu h1 { font-size:3em; color:#c00; text-shadow:0 0 20px #f00; letter-spacing:4px; margin-bottom:10px;}
+  #menu h2 { font-size:1.1em; color:#888; margin-bottom:40px; letter-spacing:2px;}
+  .menu-btn { background:#200; color:#eee; border:2px solid #a00; padding:14px 40px; margin:8px; font-size:1.1em; cursor:pointer; letter-spacing:2px; transition:.2s; font-family:inherit;}
+  .menu-btn:hover { background:#a00; box-shadow:0 0 15px #f00; }
+  .menu-btn:disabled { opacity:.3; cursor:not-allowed; }
+
+  /* ---- Night select ---- */
+  #nightSelect { background:#050000; }
+  .nights-row { display:flex; gap:12px; margin:20px 0 30px; flex-wrap:wrap; justify-content:center; max-width:600px;}
+
+  /* ---- Night intro (computer boot screen) ---- */
+  #nightIntro { background:#000; }
+  #nightIntro .bgWrap { position:absolute; inset:0; overflow:hidden; }
+  #nightIntro .bgWrap img { width:100%; height:100%; object-fit:cover; filter:brightness(.35) saturate(.7); }
+  #nightIntro .content { position:relative; z-index:2; text-align:center; background:rgba(0,0,0,.55); padding:30px 46px; border:1px solid #333; }
+  #nightIntro h1 { color:#5f5; font-size:1.8em; letter-spacing:3px; text-shadow:0 0 12px #0f0; margin-bottom:10px; }
+  #nightIntro p { color:#9c9; font-size:.95em; margin-bottom:6px; font-family:monospace; }
+  #nightIntro .menu-btn { margin-top:18px; }
+
+  /* ---- Game screen ---- */
+  #game { background:#000; }
+  #sceneWrap { position:relative; width:100%; height:100%; overflow:hidden; }
+  #sceneImg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:brightness(.55) contrast(1.05); transition:opacity .25s; }
+  #vignette { position:absolute; inset:0; pointer-events:none; box-shadow:inset 0 0 180px 60px #000; }
+
+  #hud-top { position:absolute; top:14px; left:14px; right:14px; display:flex; justify-content:space-between; font-size:.95em; color:#ddd; text-shadow:0 0 4px #000; z-index:5; flex-wrap:wrap; gap:6px;}
+  #hud-top .box { background:rgba(0,0,0,.55); padding:6px 12px; border:1px solid #444; }
+  #energyBarWrap, #hungerBarWrap { width:140px; height:12px; border:1px solid #666; background:#111; display:inline-block; vertical-align:middle; }
+  #energyBar { height:100%; background:#3c3; transition:width .3s; }
+  #hungerBar { height:100%; background:#c93; transition:width .3s; }
+  #flourText, #timeText, #nightText { display:block; }
+
+  /* door indicator */
+  #doorStatus { position:absolute; bottom:80px; left:14px; z-index:5; background:rgba(0,0,0,.55); padding:8px 14px; border:1px solid #444; font-size:.9em;}
+  #doorStatus.danger { color:#f55; border-color:#f00; animation:blink .5s infinite; }
+  @keyframes blink { 50%{opacity:.3;} }
+
+  #doorBtn { position:absolute; bottom:80px; right:14px; z-index:6; background:#300; border:2px solid #a00; color:#eee; padding:10px 18px; cursor:pointer; font-family:inherit;}
+  #doorBtn.closed { background:#030; border-color:#0a0; }
+
+  /* Lis appears at door */
+  #lisAtDoor { position:absolute; inset:0; display:none; align-items:center; justify-content:center; z-index:4; }
+  #lisAtDoor img { max-height:90%; filter:brightness(.7) drop-shadow(0 0 30px red); }
+
+  /* nav buttons */
+  #navBar { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:flex; gap:20px; z-index:6; }
+  .navBtn { width:64px; height:64px; border-radius:50%; background:rgba(40,0,0,.7); border:2px solid #a00; color:#eee; font-size:1.6em; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .navBtn:active { background:#a00; }
+
+  /* Camera mode */
+  #camView { position:absolute; inset:0; background:#000; display:none; z-index:8; flex-direction:column; }
+  #camView.active { display:flex; }
+  #camMonitorWrap { position:relative; flex:1; overflow:hidden; background:#000; }
+  #computerBg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:brightness(.8); }
+  #camScreenOverlay { position:absolute; left:20.5%; top:6.5%; width:52.5%; height:58.5%; overflow:hidden; background:#000; box-shadow:0 0 24px 6px rgba(0,0,0,.85) inset, 0 0 12px 2px rgba(0,255,120,.15); border-radius:2px; perspective:500px; }
+  #camScreenOverlay img#camMainImg { width:100%; height:100%; object-fit:cover; filter:grayscale(.4) brightness(.5) contrast(1.2); }
+  #camLisFigure { position:absolute; width:16%; transition:left 1.3s ease, top 1.3s ease, transform 1.3s ease; filter:brightness(.55) drop-shadow(0 0 6px red); pointer-events:none; display:none; transform-style:preserve-3d; will-change:transform; }
+  #camStatic { position:absolute; inset:0; background:repeating-linear-gradient(0deg,#0002,#0002 2px,transparent 2px,transparent 4px); pointer-events:none; }
+  #camLabel { position:absolute; top:6px; left:6px; color:#0f0; font-size:.7em; background:rgba(0,0,0,.5); padding:3px 7px; }
+  #camLisWarn { position:absolute; bottom:6px; left:6px; color:#f55; font-size:.65em; display:none;}
+  #camGridOverlay { position:absolute; left:20.5%; top:6.5%; width:52.5%; height:58.5%; display:none; grid-template-columns:repeat(3,1fr); gap:2px; background:#000; box-shadow:0 0 24px 6px rgba(0,0,0,.85) inset; }
+  .gridCell { position:relative; overflow:hidden; cursor:pointer; border:1px solid #222; }
+  .gridCell img.gridBg { width:100%; height:100%; object-fit:cover; filter:grayscale(.5) brightness(.45) contrast(1.2); }
+  .gridCell span { position:absolute; top:2px; left:2px; color:#0f0; font-size:.55em; background:rgba(0,0,0,.5); padding:1px 4px; }
+  .gridCell { perspective:300px; }
+  .gridLisMark { position:absolute; width:26%; transition:left 1s ease, top 1s ease, transform 1s ease; filter:brightness(.6) drop-shadow(0 0 4px red); display:none; transform-style:preserve-3d; will-change:transform; }
+  .gridLisMark img { width:100%; display:block; }
+  #camThumbs { display:flex; gap:8px; padding:10px; background:#0a0a0a; border-top:1px solid #333; justify-content:center; align-items:center; }
+  .camThumb { width:90px; height:60px; object-fit:cover; border:2px solid #333; cursor:pointer; opacity:.6; }
+  .camThumb.selected { border-color:#0f0; opacity:1; }
+  #gridToggleBtn { background:#300; border:1px solid #a00; color:#eee; padding:8px 14px; cursor:pointer; font-family:inherit; margin-left:10px; }
+  #gridToggleBtn.active { background:#030; border-color:#0a0; }
+  #exitCamBtn { position:absolute; top:10px; right:10px; z-index:9; background:#300; border:2px solid #a00; color:#eee; padding:8px 16px; cursor:pointer; font-family:inherit;}
+
+  /* Kitchen overlay */
+  #kitchenPanel { position:absolute; bottom:150px; left:50%; transform:translateX(-50%); background:rgba(10,10,10,.85); border:1px solid #555; padding:14px 20px; z-index:6; width:340px; text-align:center; display:none;}
+  #kitchenPanel.active { display:block; }
+  #kitchenPanel h3 { color:#fc5; margin-bottom:8px; font-size:1em;}
+  .traySlots { display:grid; grid-template-columns:repeat(6,1fr); gap:4px; margin:10px 0; }
+  .slot { width:36px; height:36px; border:1px solid #555; background:#222; display:flex; align-items:center; justify-content:center; font-size:1.1em;}
+  .slot.filled { background:#653; }
+  .slot.baking { background:#a72; animation:pulse 1s infinite; }
+  .slot.done { background:#3a2; }
+  @keyframes pulse { 50%{opacity:.6;} }
+  #kitchenPanel button { background:#300; border:1px solid #a00; color:#eee; padding:8px 14px; margin:4px; cursor:pointer; font-family:inherit;}
+  #kitchenPanel button:disabled { opacity:.35; cursor:not-allowed; }
+  #bakeProgressWrap { width:100%; height:8px; background:#222; margin-top:8px; display:none;}
+  #bakeProgress { height:100%; background:#fc5; width:0%; }
+
+  /* Pipes overlay handled inside camMain */
+  .leakIcon { position:absolute; width:46px; height:46px; background:rgba(0,80,200,.35); border:2px solid #5cf; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; animation:pulse .6s infinite; font-size:1.3em; }
+
+  /* Game over */
+  #gameover { background:#000; }
+  #gameover img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; filter:brightness(.6) saturate(1.6) contrast(1.4); animation:flashRed .25s infinite; transition:opacity .04s linear; }
+  @keyframes flashRed { 50% { filter:brightness(1.1) saturate(2) contrast(1.6) hue-rotate(-20deg); } }
+  @keyframes shake { 10%,90%{transform:translate(-3px,2px);} 20%,80%{transform:translate(4px,-3px);} 30%,50%,70%{transform:translate(-6px,4px);} 40%,60%{transform:translate(6px,-4px);} }
+  #gameover.active { animation: shake .35s linear 4; }
+  #gameover h1 { position:relative; z-index:2; font-size:4em; color:#f00; text-shadow:0 0 30px #f00,0 0 60px #900; letter-spacing:6px; }
+  #gameover .sub { position:relative; z-index:2; color:#ccc; margin-top:16px; }
+  #gameover .menu-btn { position:relative; z-index:2; margin-top:30px; }
+
+  /* Night clear */
+  #nightClear h1 { color:#5f5; font-size:2.4em; text-shadow:0 0 20px #0f0; }
+  #nightClear p { color:#aaa; margin-top:14px; }
+
+  /* Ending */
+  #ending { background:#000; text-align:center; padding:40px; max-width:700px; }
+  #ending img { max-height:300px; margin-bottom:20px; border:2px solid #444;}
+  #ending h1 { color:#fc5; font-size:2.2em; margin-bottom:16px; }
+  #ending p { color:#ccc; line-height:1.6; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- MENU -->
+  <div id="menu" class="screen active">
+    <h1>5 НОЧЕЙ С ЛИСОМ</h1>
+    <h2>он просто хочет пирожок</h2>
+    <button class="menu-btn" onclick="goToNightSelect()">НАЧАТЬ</button>
+    <button class="menu-btn" onclick="showRules()">ПРАВИЛА</button>
+  </div>
+
+  <!-- NIGHT SELECT -->
+  <div id="nightSelect" class="screen">
+    <h1 style="color:#c00;letter-spacing:3px;">ВЫБОР НОЧИ</h1>
+    <div class="nights-row" id="nightsRow"></div>
+    <button class="menu-btn" onclick="showScreen('menu')">НАЗАД</button>
+  </div>
+
+  <!-- NIGHT INTRO (computer boot screen) -->
+  <div id="nightIntro" class="screen">
+    <div class="bgWrap"><img src="assets/computer.jpg"></div>
+    <div class="content">
+      <h1 id="introNightTitle">НОЧЬ 1</h1>
+      <p>ЗАГРУЗКА СИСТЕМЫ НАБЛЮДЕНИЯ...</p>
+      <p>КАМЕРЫ: OK &nbsp; ДВЕРЬ: OK &nbsp; ГЕНЕРАТОР: OK</p>
+      <p>Лис где-то рядом. Доживи до 6:00.</p>
+      <button class="menu-btn" onclick="beginNight()">НАЧАТЬ СМЕНУ</button>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="screen">
+    <div id="sceneWrap">
+      <img id="sceneImg" src="">
+      <div id="vignette"></div>
+
+      <div id="hud-top">
+        <div class="box"><span id="nightText">Ночь 1</span> — <span id="timeText">00:00</span></div>
+        <div class="box">Энергия: <div id="energyBarWrap"><div id="energyBar"></div></div></div>
+        <div class="box">Голод Лиса: <div id="hungerBarWrap"><div id="hungerBar"></div></div></div>
+        <div class="box">Мука: ∞</div>
+      </div>
+
+      <div id="doorStatus">Дверь открыта</div>
+      <button id="doorBtn" onclick="toggleDoor()">ЗАКРЫТЬ ДВЕРЬ</button>
+
+      <div id="lisAtDoor"><img src="assets/lis.jpg"></div>
+
+      <div id="kitchenPanel">
+        <h3>🥧 КУХНЯ — пирожки (успокаивают Лиса)</h3>
+        <div class="traySlots" id="traySlots"></div>
+        <button id="shapeBtn" onclick="shapePie()">Слепить пирожок (2с)</button>
+        <button id="bakeBtn" onclick="startBaking()" disabled>Поставить в духовку</button>
+        <div id="bakeProgressWrap"><div id="bakeProgress"></div></div>
+        <button id="feedBtn" onclick="feedLis()" disabled>Покормить Лиса</button>
+      </div>
+
+      <div id="navBar">
+        <button class="navBtn" id="btnLeft" onclick="navLeft()">◀</button>
+        <button class="navBtn" onclick="enterCameras()">▼</button>
+        <button class="navBtn" id="btnRight" onclick="navRight()">▶</button>
+      </div>
+    </div>
+
+    <!-- Camera mode -->
+    <div id="camView">
+      <button id="exitCamBtn" onclick="exitCameras()">▲ ВЫЙТИ</button>
+      <div id="camMonitorWrap">
+        <img id="computerBg" src="assets/computer.jpg">
+        <div id="camScreenOverlay">
+          <img id="camMainImg" src="">
+          <img id="camLisFigure" src="assets/lis.jpg">
+          <div id="camStatic"></div>
+          <div id="camLabel">CAM 1 — CORRIDOR</div>
+          <div id="camLisWarn">⚠ ЛИС ЗДЕСЬ</div>
+        </div>
+        <div id="camGridOverlay">
+          <div class="gridCell" data-cam="corridor" onclick="selectCamFromGrid('corridor')">
+            <img class="gridBg" src="assets/corridor.jpg"><span>CAM 1</span>
+            <div class="gridLisMark"><img src="assets/lis.jpg"></div>
+          </div>
+          <div class="gridCell" data-cam="kitchen" onclick="selectCamFromGrid('kitchen')">
+            <img class="gridBg" src="assets/kitchen.jpg"><span>CAM 2</span>
+            <div class="gridLisMark"><img src="assets/lis.jpg"></div>
+          </div>
+          <div class="gridCell" data-cam="pipes" onclick="selectCamFromGrid('pipes')">
+            <img class="gridBg" src="assets/pipes.jpg"><span>CAM 3</span>
+            <div class="gridLisMark"><img src="assets/lis.jpg"></div>
+          </div>
+        </div>
+      </div>
+      <div id="camThumbs">
+        <img class="camThumb" data-cam="corridor" src="assets/corridor.jpg" onclick="selectCam('corridor')">
+        <img class="camThumb" data-cam="kitchen" src="assets/kitchen.jpg" onclick="selectCam('kitchen')">
+        <img class="camThumb" data-cam="pipes" src="assets/pipes.jpg" onclick="selectCam('pipes')">
+        <button id="gridToggleBtn" onclick="toggleCamGrid()">▼ ВСЕ КАМЕРЫ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="gameover" class="screen">
+    <img src="assets/gameover.jpg">
+    <h1>ТЫ МЁРТВ</h1>
+    <div class="sub">Лис нашёл тебя...</div>
+    <button class="menu-btn" onclick="retryNight()">ПОПРОБОВАТЬ СНОВА</button>
+    <button class="menu-btn" onclick="stopGameoverFlicker(); showScreen('nightSelect'); renderNights();">К ВЫБОРУ НОЧИ</button>
+  </div>
+
+  <!-- NIGHT CLEAR -->
+  <div id="nightClear" class="screen">
+    <h1>6:00 УТРА</h1>
+    <p id="nightClearText">Ночь пройдена.</p>
+    <button class="menu-btn" onclick="afterNightClear()">ДАЛЬШЕ</button>
+  </div>
+
+  <!-- ENDING -->
+  <div id="ending" class="screen">
+    <img src="assets/lis.jpg">
+    <h1>КОНЕЦ</h1>
+    <p>Утром пятого дня во двор въезжают полицейские машины. Лиса наконец ловят — больше он никого не побеспокоит.</p>
+    <p>А ты пакуешь чемодан и уезжаешь в деревню, к своему Пуху. Тишина, свежий воздух и никаких камер видеонаблюдения.</p>
+    <p style="color:#5f5;margin-top:20px;">ИГРА ПРОЙДЕНА</p>
+    <button class="menu-btn" onclick="location.reload()">В МЕНЮ</button>
+  </div>
+
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const TOTAL_NIGHTS = 5;
+const REAL_SECONDS_PER_NIGHT = 90; // real seconds to go from 00:00 to 06:00
+const nightDifficulty = n => ({
+  lisMoveInterval: Math.max(3.5, 9 - n*1.1),      // seconds between Lis approach checks
+  lisWalkInterval: Math.max(2.2, 5.5 - n*0.4),    // seconds between Lis wandering to a new camera spot
+  doorGraceTime: Math.max(1.4, 3.2 - n*0.3),      // seconds player has to react
+  leakInterval: Math.max(6, 16 - n*2),            // seconds between pipe leaks
+  leakGrace: Math.max(5, 11 - n*1),               // seconds before leak causes damage
+  energyDrain: 0.35 + n*0.13,                     // % per second baseline (slower drain)
+  hungerRate: 0.35 + n*0.18,                      // hunger % per second
+  approachChance: 0.3 + n*0.08,                   // chance Lis actually goes for door vs wanders
+});
+
+/* ================= AUDIO ================= */
+let actx = null;
+function ensureAudio(){
+  if(!actx){ actx = new (window.AudioContext||window.webkitAudioContext)(); }
+  if(actx.state==='suspended') actx.resume();
+  return actx;
+}
+function beep(freq, dur, type, vol, delay){
+  delay = delay||0;
+  const ctx = ensureAudio();
+  const t0 = ctx.currentTime + delay;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type; osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(vol, t0+0.01);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0+dur);
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start(t0); osc.stop(t0+dur+0.02);
+}
+function sfxClick(){ beep(600,0.05,'square',0.12); }
+function sfxDoor(){ beep(160,0.12,'square',0.22); beep(90,0.18,'square',0.18,0.05); }
+function sfxAlarm(){ beep(880,0.1,'sawtooth',0.15); beep(660,0.1,'sawtooth',0.13,0.12); }
+function sfxDrip(){ beep(1200,0.07,'sine',0.13); beep(900,0.09,'sine',0.1,0.08); }
+function sfxFix(){ beep(500,0.08,'triangle',0.16); beep(750,0.1,'triangle',0.16,0.09); }
+function sfxDing(){ beep(1046,0.12,'sine',0.18); beep(1568,0.18,'sine',0.16,0.12); }
+function sfxFeed(){ beep(300,0.06,'square',0.13); beep(420,0.06,'square',0.13,0.07); }
+function sfxDamage(){ beep(110,0.25,'sawtooth',0.2); beep(70,0.3,'sawtooth',0.18,0.1); }
+function sfxScream(){
+  const ctx = ensureAudio();
+  const dur = 1.1;
+  const bufferSize = Math.floor(ctx.sampleRate*dur);
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * Math.pow(1-i/bufferSize, 0.5); }
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type='bandpass';
+  filter.frequency.setValueAtTime(1800, ctx.currentTime);
+  filter.frequency.exponentialRampToValueAtTime(300, ctx.currentTime+dur);
+  filter.Q.value = 6;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.45, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime+dur);
+  noise.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+  noise.start();
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(130, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(45, ctx.currentTime+dur);
+  const g2 = ctx.createGain();
+  g2.gain.setValueAtTime(0.28, ctx.currentTime);
+  g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+dur);
+  osc.connect(g2); g2.connect(ctx.destination);
+  osc.start(); osc.stop(ctx.currentTime+dur);
+}
+
+/* ================= STATE ================= */
+const ROOM_VIEWS = ['corridor','kitchen','livingroom'];
+const ROOM_IMG = { corridor:'corridor.jpg', kitchen:'kitchen.jpg', livingroom:'livingroom.jpg' };
+
+let state = null;
+let unlockedNights = 1;
+let timers = [];
+let gameoverFlickerInterval = null;
+
+function clearTimers(){ timers.forEach(t=>clearInterval(t)); timers.forEach(t=>clearTimeout(t)); timers=[]; }
+function every(fn, ms){ const id=setInterval(fn, ms); timers.push(id); return id; }
+function after(fn, ms){ const id=setTimeout(fn, ms); timers.push(id); return id; }
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showRules(){
+  ensureAudio();
+  alert("Правила:\n\n— Доживи до 6:00 все 5 ночей.\n— Следи за камерами (кнопка ▼), там видно Лиса.\n— Если Лис подходит к двери — быстро жми ЗАКРЫТЬ ДВЕРЬ.\n— На кухне лепи и пеки пирожки, корми Лиса — он успокаивается.\n— На камере с трубами чини утечки, пока не поздно.\n— Следи за энергией генератора — она тратится на всё.\n— Стрелками ◀ ▶ поворачивайся по комнате: коридор → кухня → гостиная.");
+}
+
+function goToNightSelect(){ ensureAudio(); renderNights(); showScreen('nightSelect'); }
+
+function renderNights(){
+  const row = document.getElementById('nightsRow');
+  row.innerHTML = '';
+  for(let n=1;n<=TOTAL_NIGHTS;n++){
+    const btn = document.createElement('button');
+    btn.className = 'menu-btn';
+    btn.textContent = 'НОЧЬ ' + n;
+    btn.disabled = n > unlockedNights;
+    btn.onclick = () => showNightIntro(n);
+    row.appendChild(btn);
+  }
+}
+
+let pendingNight = 1;
+function showNightIntro(n){
+  ensureAudio();
+  pendingNight = n;
+  document.getElementById('introNightTitle').textContent = 'НОЧЬ ' + n;
+  showScreen('nightIntro');
+}
+function beginNight(){
+  sfxClick();
+  startNight(pendingNight);
+}
+
+/* ================= GAME STATE ================= */
+function startNight(n){
+  clearTimers();
+  blackoutTriggered = false;
+  const diff = nightDifficulty(n);
+  state = {
+    night: n,
+    diff,
+    facing: 'corridor', // corridor | kitchen (via double tap)
+    inCamera: false,
+    currentCam: 'corridor',
+    doorClosed: false,
+    lisLocation: 'corridor', // corridor -> door -> (in)
+    lisAtDoorTimer: null,
+    lisApproaching: false,
+    energy: 100,
+    elapsed: 0, // seconds real time
+    trayPies: [], // array of 'empty'|'raw'|'baking'|'done' length 12
+    shapingBusy: false,
+    baking: false,
+    bakeProgress: 0,
+    leakActive: false,
+    leakTimer: 0,
+    leakGraceLeft: 0,
+    alarmInterval: null,
+    hunger: 20,
+    lisPos: { x: 45, y: 55 },
+    camGridMode: false,
+    ended: false,
+  };
+  for(let i=0;i<12;i++) state.trayPies.push('empty');
+
+  document.getElementById('nightText').textContent = 'Ночь ' + n;
+  document.getElementById('sceneImg').src = 'assets/corridor.jpg';
+  document.getElementById('kitchenPanel').classList.remove('active');
+  document.getElementById('doorBtn').classList.remove('closed');
+  document.getElementById('doorBtn').textContent = 'ЗАКРЫТЬ ДВЕРЬ';
+  document.getElementById('doorStatus').textContent = 'Дверь открыта';
+  document.getElementById('doorStatus').classList.remove('danger');
+  document.getElementById('lisAtDoor').style.display = 'none';
+  document.getElementById('camGridOverlay').style.display = 'none';
+  document.getElementById('camScreenOverlay').style.display = 'block';
+  document.getElementById('gridToggleBtn').classList.remove('active');
+  exitCamerasInstant();
+  renderTray();
+  updateEnergyBar();
+  updateHungerBar();
+  showScreen('game');
+
+  every(gameTick, 250);
+  every(lisBehaviorTick, diff.lisMoveInterval*1000);
+  every(lisWanderTick, diff.lisWalkInterval*1000);
+  every(leakTick, 1000);
+  every(hungerTick, 1000);
+  lisWanderTick();
+}
+
+function gameTick(){
+  if(!state || state.ended) return;
+  state.elapsed += 0.25;
+  const total = REAL_SECONDS_PER_NIGHT;
+  const frac = Math.min(state.elapsed/total, 1);
+  const hour = Math.floor(frac*6);
+  const minute = Math.floor((frac*6*60)%60);
+  const displayHour = (hour===0? 12: hour); // 00:00 shown as 12:00 AM style -> simpler just show 0-6
+  document.getElementById('timeText').textContent =
+    String(hour).padStart(2,'0') + ':' + String(minute).padStart(2,'0');
+
+  // energy drain
+  let drain = state.diff.energyDrain * 0.25;
+  if(state.inCamera) drain *= 1.15;
+  if(!state.doorClosed) drain *= 1.0; else drain *= 1.3;
+  state.energy = Math.max(0, state.energy - drain);
+  updateEnergyBar();
+  if(state.energy <= 0){
+    handleBlackout();
+  }
+
+  if(frac >= 1){
+    winNight();
+  }
+}
+
+function updateEnergyBar(){
+  const bar = document.getElementById('energyBar');
+  bar.style.width = state.energy + '%';
+  bar.style.background = state.energy > 40 ? '#3c3' : (state.energy>15 ? '#cc3':'#c33');
+}
+
+function updateHungerBar(){
+  const bar = document.getElementById('hungerBar');
+  bar.style.width = state.hunger + '%';
+  bar.style.background = state.hunger < 50 ? '#3c3' : (state.hunger < 85 ? '#c93':'#c33');
+}
+
+function hungerTick(){
+  if(!state || state.ended) return;
+  state.hunger = Math.min(100, state.hunger + state.diff.hungerRate);
+  updateHungerBar();
+}
+
+let blackoutTriggered = false;
+function handleBlackout(){
+  if(blackoutTriggered) return;
+  blackoutTriggered = true;
+  // no camera/door control possible visually — just heavily increase death chance
+  document.getElementById('doorStatus').textContent = 'ЭНЕРГИЯ КОНЧИЛАСЬ — темнота...';
+  document.getElementById('doorStatus').classList.add('danger');
+  after(()=>{ if(state && !state.ended) triggerGameOver(); }, 4000);
+}
+
+/* ---- Lis behavior ---- */
+function lisBehaviorTick(){
+  if(!state || state.ended || state.energy<=0) return;
+  const roll = Math.random();
+  const hungerBoost = state.hunger >= 85 ? 0.25 : (state.hunger >= 60 ? 0.1 : 0);
+  const effectiveChance = state.diff.approachChance + hungerBoost;
+  if(state.lisLocation === 'corridor' && roll < effectiveChance){
+    state.lisApproaching = true;
+    state.lisLocation = 'door';
+    state.lisPos = { x: 45 + Math.random()*10, y: 50 + Math.random()*10 };
+    document.getElementById('doorStatus').textContent = 'Лис приближается к двери!';
+    document.getElementById('doorStatus').classList.add('danger');
+    if(state.currentCam==='corridor') showCamLisWarn(true);
+    updateLisVisual();
+    if(state.doorClosed){
+      // safe, he retreats after a bit
+      after(()=>{ if(state && state.lisLocation==='door'){ state.lisLocation='corridor'; state.lisApproaching=false; resetDoorStatus(); showCamLisWarn(false); updateLisVisual();} }, 3000);
+    } else {
+      sfxAlarm();
+      if(state.alarmInterval) clearInterval(state.alarmInterval);
+      state.alarmInterval = every(()=>{ if(state && state.lisLocation==='door' && !state.doorClosed) sfxAlarm(); }, 550);
+      state.lisAtDoorTimer = after(()=>{
+        if(state && state.lisLocation==='door' && !state.doorClosed){
+          triggerGameOver();
+        }
+      }, state.diff.doorGraceTime*1000);
+    }
+  } else if(state.lisLocation==='corridor'){
+    // wanders, maybe visits kitchen briefly - purely cosmetic for camera flavor
+  }
+}
+
+function resetDoorStatus(){
+  document.getElementById('doorStatus').textContent = state.doorClosed ? 'Дверь закрыта' : 'Дверь открыта';
+  document.getElementById('doorStatus').classList.remove('danger');
+}
+
+function toggleDoor(){
+  if(!state || state.ended) return;
+  sfxDoor();
+  state.doorClosed = !state.doorClosed;
+  const btn = document.getElementById('doorBtn');
+  btn.textContent = state.doorClosed ? 'ОТКРЫТЬ ДВЕРЬ' : 'ЗАКРЫТЬ ДВЕРЬ';
+  btn.classList.toggle('closed', state.doorClosed);
+  if(!state.lisApproaching || state.lisLocation!=='door'){
+    resetDoorStatus();
+  } else if(state.doorClosed){
+    if(state.lisAtDoorTimer) clearTimeout(state.lisAtDoorTimer);
+    if(state.alarmInterval){ clearInterval(state.alarmInterval); state.alarmInterval=null; }
+    document.getElementById('doorStatus').textContent = 'Дверь закрыта — Лис снаружи';
+    after(()=>{ if(state && state.lisLocation==='door'){ state.lisLocation='corridor'; state.lisApproaching=false; resetDoorStatus(); showCamLisWarn(false); updateLisVisual();} }, 3000);
+  }
+}
+
+function triggerGameOver(){
+  if(!state || state.ended) return;
+  state.ended = true;
+  if(state.alarmInterval) clearInterval(state.alarmInterval);
+  clearTimers();
+  sfxScream();
+  showScreen('gameover');
+  const img = document.querySelector('#gameover img');
+  img.style.opacity = '1';
+  let flickerCount = 0;
+  gameoverFlickerInterval = setInterval(()=>{
+    img.style.opacity = (flickerCount % 3 === 0) ? '0.15' : '1';
+    flickerCount++;
+  }, 90);
+}
+
+function stopGameoverFlicker(){
+  if(gameoverFlickerInterval){ clearInterval(gameoverFlickerInterval); gameoverFlickerInterval = null; }
+  const img = document.querySelector('#gameover img');
+  if(img) img.style.opacity = '1';
+}
+
+function winNight(){
+  if(!state || state.ended) return;
+  state.ended = true;
+  clearTimers();
+  unlockedNights = Math.max(unlockedNights, state.night+1);
+  document.getElementById('nightClearText').textContent =
+    state.night < TOTAL_NIGHTS
+      ? `Ночь ${state.night} пройдена. Впереди ещё ${TOTAL_NIGHTS-state.night}.`
+      : `Ночь ${state.night} пройдена. Это была последняя.`;
+  showScreen('nightClear');
+}
+
+function afterNightClear(){
+  if(state.night >= TOTAL_NIGHTS){
+    showScreen('ending');
+  } else {
+    goToNightSelect();
+  }
+}
+
+function retryNight(){
+  blackoutTriggered = false;
+  stopGameoverFlicker();
+  startNight(state.night);
+}
+
+/* ================= NAV / FACING ================= */
+function navLeft(){
+  if(!state || state.ended) return;
+  sfxClick();
+  const idx = ROOM_VIEWS.indexOf(state.facing);
+  state.facing = ROOM_VIEWS[(idx - 1 + ROOM_VIEWS.length) % ROOM_VIEWS.length];
+  updateSceneView();
+}
+function navRight(){
+  if(!state || state.ended) return;
+  sfxClick();
+  const idx = ROOM_VIEWS.indexOf(state.facing);
+  state.facing = ROOM_VIEWS[(idx + 1) % ROOM_VIEWS.length];
+  updateSceneView();
+}
+
+function updateSceneView(){
+  const img = document.getElementById('sceneImg');
+  const kPanel = document.getElementById('kitchenPanel');
+  img.src = 'assets/' + ROOM_IMG[state.facing];
+  kPanel.classList.toggle('active', state.facing === 'kitchen');
+}
+
+/* ================= CAMERAS ================= */
+function enterCameras(){
+  if(!state || state.ended) return;
+  sfxClick();
+  state.inCamera = true;
+  document.getElementById('camView').classList.add('active');
+  selectCam(state.currentCam);
+}
+function exitCameras(){
+  if(!state) return;
+  sfxClick();
+  state.inCamera = false;
+  document.getElementById('camView').classList.remove('active');
+}
+function exitCamerasInstant(){
+  document.getElementById('camView').classList.remove('active');
+}
+
+const camLabels = { corridor:'CAM 1 — КОРИДОР', kitchen:'CAM 2 — КУХНЯ', pipes:'CAM 3 — ТРУБЫ' };
+function selectCam(cam){
+  if(!state) return;
+  state.currentCam = cam;
+  document.querySelectorAll('.camThumb').forEach(t=>t.classList.toggle('selected', t.dataset.cam===cam));
+  document.getElementById('camMainImg').src = 'assets/'+cam+'.jpg';
+  document.getElementById('camLabel').textContent = camLabels[cam];
+  showCamLisWarn(cam==='corridor' && state.lisLocation==='door');
+  renderLeakOnCam();
+  updateLisVisual();
+}
+function showCamLisWarn(show){
+  document.getElementById('camLisWarn').style.display = show ? 'block' : 'none';
+}
+
+/* ---- Lis wandering across cameras ---- */
+const WANDER_LOCATIONS = ['corridor','kitchen','pipes'];
+function lisWanderTick(){
+  if(!state || state.ended || state.energy<=0) return;
+  if(state.lisLocation === 'door') return; // busy threatening the door, don't wander
+  const next = WANDER_LOCATIONS[Math.floor(Math.random()*WANDER_LOCATIONS.length)];
+  state.lisLocation = next;
+  state.lisPos = { x: 15 + Math.random()*65, y: 30 + Math.random()*45 };
+  updateLisVisual();
+}
+
+// Pseudo-3D "render": derive a rotateY/scale transform from the movement
+// vector + depth (vertical position) so Lis appears to turn and step
+// toward/away from camera instead of just sliding flat across the frame.
+function lisPseudo3DTransform(pos){
+  const prev = state.lisPrevPos || pos;
+  const dx = pos.x - prev.x;
+  const depth = 0.75 + (pos.y / 100) * 0.6;           // farther up = smaller/farther, lower = bigger/closer
+  let rotateY = Math.max(-32, Math.min(32, -dx * 2.2)); // turn toward direction of travel
+  if(Math.abs(dx) < 0.5) rotateY *= 0.15;                // idle: face mostly forward
+  state.lisPrevPos = pos;
+  return `translateZ(0) rotateY(${rotateY.toFixed(1)}deg) scale(${depth.toFixed(2)})`;
+}
+
+function updateLisVisual(){
+  if(!state) return;
+  const effectiveLoc = state.lisLocation === 'door' ? 'corridor' : state.lisLocation;
+  const transform = lisPseudo3DTransform(state.lisPos);
+  if(state.camGridMode){
+    document.querySelectorAll('.gridCell').forEach(cell=>{
+      const cam = cell.dataset.cam;
+      const mark = cell.querySelector('.gridLisMark');
+      if(cam === effectiveLoc){
+        mark.style.display = 'block';
+        mark.style.left = state.lisPos.x + '%';
+        mark.style.top = state.lisPos.y + '%';
+        mark.style.transform = transform;
+      } else {
+        mark.style.display = 'none';
+      }
+    });
+  } else {
+    const fig = document.getElementById('camLisFigure');
+    if(state.currentCam === effectiveLoc){
+      fig.style.display = 'block';
+      fig.style.left = state.lisPos.x + '%';
+      fig.style.top = state.lisPos.y + '%';
+      fig.style.transform = transform;
+    } else {
+      fig.style.display = 'none';
+    }
+  }
+}
+
+function toggleCamGrid(){
+  if(!state) return;
+  sfxClick();
+  state.camGridMode = !state.camGridMode;
+  document.getElementById('camScreenOverlay').style.display = state.camGridMode ? 'none' : 'block';
+  document.getElementById('camGridOverlay').style.display = state.camGridMode ? 'grid' : 'none';
+  document.getElementById('gridToggleBtn').classList.toggle('active', state.camGridMode);
+  updateLisVisual();
+}
+function selectCamFromGrid(cam){
+  if(!state) return;
+  state.camGridMode = false;
+  document.getElementById('camScreenOverlay').style.display = 'block';
+  document.getElementById('camGridOverlay').style.display = 'none';
+  document.getElementById('gridToggleBtn').classList.remove('active');
+  selectCam(cam);
+}
+
+/* ================= KITCHEN / PIES ================= */
+function renderTray(){
+  const wrap = document.getElementById('traySlots');
+  wrap.innerHTML = '';
+  state.trayPies.forEach((s, i)=>{
+    const div = document.createElement('div');
+    div.className = 'slot' + (s==='raw'?' filled':'') + (s==='baking'?' baking':'') + (s==='done'?' done':'');
+    div.textContent = s==='empty' ? '' : (s==='done' ? '🥧' : '●');
+    wrap.appendChild(div);
+  });
+  const rawCount = state.trayPies.filter(s=>s==='raw').length;
+  const doneCount = state.trayPies.filter(s=>s==='done').length;
+  document.getElementById('bakeBtn').disabled = state.baking || rawCount===0;
+  document.getElementById('feedBtn').disabled = doneCount===0;
+  document.getElementById('shapeBtn').disabled = state.shapingBusy || state.baking || state.trayPies.every(s=>s!=='empty');
+}
+
+function shapePie(){
+  if(!state || state.shapingBusy || state.baking) return;
+  const idx = state.trayPies.indexOf('empty');
+  if(idx===-1) return;
+  sfxClick();
+  state.shapingBusy = true;
+  renderTray();
+  after(()=>{
+    if(!state) return;
+    state.trayPies[idx] = 'raw';
+    state.shapingBusy = false;
+    renderTray();
+  }, 2000);
+}
+
+function startBaking(){
+  if(!state || state.baking) return;
+  const rawCount = state.trayPies.filter(s=>s==='raw').length;
+  if(rawCount===0) return;
+  state.baking = true;
+  state.trayPies = state.trayPies.map(s=> s==='raw' ? 'baking' : s);
+  renderTray();
+  document.getElementById('bakeProgressWrap').style.display = 'block';
+  state.bakeProgress = 0;
+  const bakeTime = 8000;
+  const step = 200;
+  const bar = document.getElementById('bakeProgress');
+  const iv = every(()=>{
+    state.bakeProgress += step;
+    bar.style.width = Math.min(100, state.bakeProgress/bakeTime*100) + '%';
+    if(state.bakeProgress >= bakeTime){
+      clearInterval(iv);
+      sfxDing();
+      state.trayPies = state.trayPies.map(s=> s==='baking' ? 'done' : s);
+      state.baking = false;
+      document.getElementById('bakeProgressWrap').style.display = 'none';
+      bar.style.width='0%';
+      renderTray();
+    }
+  }, step);
+}
+
+function feedLis(){
+  if(!state) return;
+  const idx = state.trayPies.indexOf('done');
+  if(idx===-1) return;
+  sfxFeed();
+  state.trayPies[idx] = 'empty';
+  state.energy = Math.min(100, state.energy + 3);
+  state.hunger = Math.max(0, state.hunger - 40);
+  updateHungerBar();
+  if(state.lisLocation==='door'){
+    state.lisLocation = 'corridor';
+    state.lisApproaching = false;
+    if(state.lisAtDoorTimer) clearTimeout(state.lisAtDoorTimer);
+    if(state.alarmInterval){ clearInterval(state.alarmInterval); state.alarmInterval=null; }
+    resetDoorStatus();
+    showCamLisWarn(false);
+    updateLisVisual();
+  }
+  renderTray();
+  updateEnergyBar();
+}
+
+/* ================= PIPES / LEAKS ================= */
+function leakTick(){
+  if(!state || state.ended || state.energy<=0) return;
+  if(!state.leakActive){
+    state.leakTimer++;
+    if(state.leakTimer >= state.diff.leakInterval){
+      state.leakActive = true;
+      state.leakTimer = 0;
+      state.leakGraceLeft = state.diff.leakGrace;
+      sfxDrip();
+      renderLeakOnCam();
+    }
+  } else {
+    state.leakGraceLeft--;
+    if(state.leakGraceLeft <= 0){
+      state.leakActive = false;
+      state.energy = Math.max(0, state.energy - 20);
+      sfxDamage();
+      updateEnergyBar();
+      renderLeakOnCam();
+    }
+  }
+}
+function renderLeakOnCam(){
+  const main = document.getElementById('camScreenOverlay');
+  const old = main.querySelector('.leakIcon');
+  if(old) old.remove();
+  if(state.leakActive && state.currentCam==='pipes'){
+    const icon = document.createElement('div');
+    icon.className = 'leakIcon';
+    icon.textContent = '💧';
+    icon.style.left = '45%';
+    icon.style.top = '55%';
+    icon.onclick = fixLeak;
+    main.appendChild(icon);
+  }
+}
+function fixLeak(){
+  if(!state || !state.leakActive) return;
+  sfxFix();
+  state.leakActive = false;
+  renderLeakOnCam();
+}
+
+/* ================= INIT ================= */
+renderNights();
+</script>
+</body>
+</html>
