@@ -2,12 +2,12 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>5 ночей с Лисом</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; }
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent; }
   html,body { width:100%; height:100%; background:#000; font-family:'Courier New',monospace; overflow:hidden; }
-  #app { position:relative; width:100vw; height:100vh; background:#000; color:#eee; }
+  #app { position:relative; width:100%; height:100%; background:#000; color:#eee; }
   .screen { position:absolute; inset:0; display:none; }
   .screen.active { display:flex; flex-direction:column; align-items:center; justify-content:center; }
 
@@ -50,7 +50,7 @@
   #doorStatus.danger { color:#f55; border-color:#f00; animation:blink .5s infinite; }
   @keyframes blink { 50%{opacity:.3;} }
 
-  #doorBtn { position:absolute; bottom:80px; right:14px; z-index:6; background:#300; border:2px solid #a00; color:#eee; padding:10px 18px; cursor:pointer; font-family:inherit;}
+  #doorBtn { position:absolute; bottom:calc(80px + env(safe-area-inset-bottom)); right:14px; z-index:6; background:#300; border:2px solid #a00; color:#eee; padding:10px 18px; cursor:pointer; font-family:inherit; touch-action:manipulation;}
   #doorBtn.closed { background:#030; border-color:#0a0; }
 
   /* Lis appears at door */
@@ -58,8 +58,8 @@
   #lisAtDoor img { max-height:90%; filter:brightness(.7) drop-shadow(0 0 30px red); }
 
   /* nav buttons */
-  #navBar { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); display:flex; gap:20px; z-index:6; }
-  .navBtn { width:64px; height:64px; border-radius:50%; background:rgba(40,0,0,.7); border:2px solid #a00; color:#eee; font-size:1.6em; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  #navBar { position:absolute; bottom:calc(14px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); display:flex; gap:20px; z-index:6; }
+  .navBtn { width:64px; height:64px; border-radius:50%; background:rgba(40,0,0,.7); border:2px solid #a00; color:#eee; font-size:1.6em; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; }
   .navBtn:active { background:#a00; }
 
   /* Camera mode */
