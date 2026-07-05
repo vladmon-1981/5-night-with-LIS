@@ -50,6 +50,9 @@
   #doorStatus.danger { color:#f55; border-color:#f00; animation:blink .5s infinite; }
   @keyframes blink { 50%{opacity:.3;} }
 
+  #leakNotice { position:absolute; top:60px; left:50%; transform:translateX(-50%); z-index:5; background:rgba(150,20,0,.85); border:2px solid #f55; color:#fff; padding:10px 18px; display:none; font-size:.95em; animation:blink .6s infinite; }
+  #leakNotice.active { display:block; }
+
   #doorBtn { position:absolute; bottom:calc(80px + env(safe-area-inset-bottom)); right:14px; z-index:6; background:#300; border:2px solid #a00; color:#eee; padding:10px 18px; cursor:pointer; font-family:inherit; touch-action:manipulation;}
   #doorBtn.closed { background:#030; border-color:#0a0; }
 
@@ -99,8 +102,20 @@
   @keyframes pulse { 50%{opacity:.6;} }
   #kitchenPanel button { background:#300; border:1px solid #a00; color:#eee; padding:8px 14px; margin:4px; cursor:pointer; font-family:inherit;}
   #kitchenPanel button:disabled { opacity:.35; cursor:not-allowed; }
-  #bakeProgressWrap { width:100%; height:8px; background:#222; margin-top:8px; display:none;}
+  #bakeProgressWrap { width:100%; height:8px; background:#222; margin-top:8px; display:none; position:relative; }
   #bakeProgress { height:100%; background:#fc5; width:0%; }
+  #ovenFlame { position:absolute; right:-4px; top:-14px; font-size:1.2em; display:none; animation:pulse .4s infinite; }
+  #bakeProgressWrap.baking #ovenFlame { display:inline-block; }
+
+  #rollAnimWrap { display:none; align-items:center; justify-content:center; gap:6px; margin:8px 0; font-size:1.6em; height:32px; }
+  #rollAnimWrap.active { display:flex; }
+  #pinEmoji { display:inline-block; animation:rollPin .5s ease-in-out infinite; }
+  #doughEmoji { display:inline-block; animation:flattenDough .5s ease-in-out infinite; }
+  @keyframes rollPin { 0%,100%{ transform:translateX(-14px) rotate(-8deg);} 50%{ transform:translateX(14px) rotate(8deg);} }
+  @keyframes flattenDough { 0%,100%{ transform:scaleX(1) scaleY(1);} 50%{ transform:scaleX(1.25) scaleY(.8);} }
+
+  #camFeedBtn { position:absolute; bottom:8px; right:8px; z-index:6; background:#300; border:2px solid #a00; color:#eee; padding:6px 12px; cursor:pointer; font-family:inherit; font-size:.75em; display:none; }
+  #camFeedBtn.show { display:block; }
 
   /* Pipes overlay handled inside camMain */
   .leakIcon { position:absolute; width:46px; height:46px; background:rgba(0,80,200,.35); border:2px solid #5cf; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; animation:pulse .6s infinite; font-size:1.3em; }
@@ -166,8 +181,9 @@
         <div class="box"><span id="nightText">Ночь 1</span> — <span id="timeText">00:00</span></div>
         <div class="box">Энергия: <div id="energyBarWrap"><div id="energyBar"></div></div></div>
         <div class="box">Голод Лиса: <div id="hungerBarWrap"><div id="hungerBar"></div></div></div>
-        <div class="box">Мука: ∞</div>
       </div>
+
+      <div id="leakNotice">⚠ ТРУБЫ ТЕКУТ! ЗАЙДИ В КАМЕРЫ И ПОЧИНИ!</div>
 
       <div id="doorStatus">Дверь открыта</div>
       <button id="doorBtn" onclick="toggleDoor()">ЗАКРЫТЬ ДВЕРЬ</button>
@@ -178,8 +194,9 @@
         <h3>🥧 КУХНЯ — пирожки (успокаивают Лиса)</h3>
         <div class="traySlots" id="traySlots"></div>
         <button id="shapeBtn" onclick="shapePie()">Слепить пирожок (2с)</button>
+        <div id="rollAnimWrap"><span id="doughEmoji">🥟</span><span id="pinEmoji">🔨</span></div>
         <button id="bakeBtn" onclick="startBaking()" disabled>Поставить в духовку</button>
-        <div id="bakeProgressWrap"><div id="bakeProgress"></div></div>
+        <div id="bakeProgressWrap"><div id="bakeProgress"></div><span id="ovenFlame">🔥</span></div>
         <button id="feedBtn" onclick="feedLis()" disabled>Покормить Лиса</button>
       </div>
 
@@ -201,6 +218,7 @@
           <div id="camStatic"></div>
           <div id="camLabel">CAM 1 — CORRIDOR</div>
           <div id="camLisWarn">⚠ ЛИС ЗДЕСЬ</div>
+          <button id="camFeedBtn" onclick="feedLis()">Покормить Лиса</button>
         </div>
         <div id="camGridOverlay">
           <div class="gridCell" data-cam="corridor" onclick="selectCamFromGrid('corridor')">
@@ -329,7 +347,7 @@ function sfxScream(){
 
 /* ================= STATE ================= */
 const ROOM_VIEWS = ['corridor','kitchen','livingroom'];
-const ROOM_IMG = { corridor:'corridor.jpg', kitchen:'kitchen.jpg', livingroom:'livingroom.jpg' };
+const ROOM_IMG = { corridor:'computer.jpg', kitchen:'kitchen.jpg', livingroom:'livingroom.jpg' };
 
 let state = null;
 let unlockedNights = 1;
@@ -410,13 +428,15 @@ function startNight(n){
   for(let i=0;i<12;i++) state.trayPies.push('empty');
 
   document.getElementById('nightText').textContent = 'Ночь ' + n;
-  document.getElementById('sceneImg').src = 'assets/corridor.jpg';
+  document.getElementById('sceneImg').src = 'assets/computer.jpg';
   document.getElementById('kitchenPanel').classList.remove('active');
   document.getElementById('doorBtn').classList.remove('closed');
   document.getElementById('doorBtn').textContent = 'ЗАКРЫТЬ ДВЕРЬ';
   document.getElementById('doorStatus').textContent = 'Дверь открыта';
   document.getElementById('doorStatus').classList.remove('danger');
   document.getElementById('lisAtDoor').style.display = 'none';
+  document.getElementById('leakNotice').classList.remove('active');
+  document.getElementById('rollAnimWrap').classList.remove('active');
   document.getElementById('camGridOverlay').style.display = 'none';
   document.getElementById('camScreenOverlay').style.display = 'block';
   document.getElementById('gridToggleBtn').classList.remove('active');
@@ -626,6 +646,7 @@ function exitCameras(){
   sfxClick();
   state.inCamera = false;
   document.getElementById('camView').classList.remove('active');
+  updateLisVisual();
 }
 function exitCamerasInstant(){
   document.getElementById('camView').classList.remove('active');
@@ -698,6 +719,9 @@ function updateLisVisual(){
       fig.style.display = 'none';
     }
   }
+  const doneCount = state.trayPies ? state.trayPies.filter(s=>s==='done').length : 0;
+  const showFeed = !state.camGridMode && state.inCamera && state.currentCam === effectiveLoc && doneCount>0;
+  document.getElementById('camFeedBtn').classList.toggle('show', showFeed);
 }
 
 function toggleCamGrid(){
@@ -733,6 +757,7 @@ function renderTray(){
   document.getElementById('bakeBtn').disabled = state.baking || rawCount===0;
   document.getElementById('feedBtn').disabled = doneCount===0;
   document.getElementById('shapeBtn').disabled = state.shapingBusy || state.baking || state.trayPies.every(s=>s!=='empty');
+  updateLisVisual();
 }
 
 function shapePie(){
@@ -741,11 +766,13 @@ function shapePie(){
   if(idx===-1) return;
   sfxClick();
   state.shapingBusy = true;
+  document.getElementById('rollAnimWrap').classList.add('active');
   renderTray();
   after(()=>{
     if(!state) return;
     state.trayPies[idx] = 'raw';
     state.shapingBusy = false;
+    document.getElementById('rollAnimWrap').classList.remove('active');
     renderTray();
   }, 2000);
 }
@@ -757,7 +784,9 @@ function startBaking(){
   state.baking = true;
   state.trayPies = state.trayPies.map(s=> s==='raw' ? 'baking' : s);
   renderTray();
-  document.getElementById('bakeProgressWrap').style.display = 'block';
+  const wrap = document.getElementById('bakeProgressWrap');
+  wrap.style.display = 'block';
+  wrap.classList.add('baking');
   state.bakeProgress = 0;
   const bakeTime = 8000;
   const step = 200;
@@ -770,7 +799,8 @@ function startBaking(){
       sfxDing();
       state.trayPies = state.trayPies.map(s=> s==='baking' ? 'done' : s);
       state.baking = false;
-      document.getElementById('bakeProgressWrap').style.display = 'none';
+      wrap.style.display = 'none';
+      wrap.classList.remove('baking');
       bar.style.width='0%';
       renderTray();
     }
@@ -809,16 +839,17 @@ function leakTick(){
       state.leakTimer = 0;
       state.leakGraceLeft = state.diff.leakGrace;
       sfxDrip();
+      document.getElementById('leakNotice').classList.add('active');
       renderLeakOnCam();
     }
   } else {
     state.leakGraceLeft--;
     if(state.leakGraceLeft <= 0){
       state.leakActive = false;
-      state.energy = Math.max(0, state.energy - 20);
+      document.getElementById('leakNotice').classList.remove('active');
       sfxDamage();
-      updateEnergyBar();
       renderLeakOnCam();
+      triggerGameOver();
     }
   }
 }
@@ -840,6 +871,7 @@ function fixLeak(){
   if(!state || !state.leakActive) return;
   sfxFix();
   state.leakActive = false;
+  document.getElementById('leakNotice').classList.remove('active');
   renderLeakOnCam();
 }
 
