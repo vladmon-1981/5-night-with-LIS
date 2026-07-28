@@ -938,8 +938,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-camera.position.set(0, 1.3, 4.2);
-camera.lookAt(0, 0.7, 0);
+camera.position.set(0, 1.15, 5.2);
+camera.lookAt(0, 1.15, 0);
 
 scene.add(new THREE.AmbientLight(0xff5555, 0.7));
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -951,52 +951,12 @@ scene.add(rimLight);
 
 let lisModel = null;
 let modelBaseY = 0;
-const limbPivots = {};
-new GLTFLoader().load('assets/dog_lis.glb', (gltf)=>{
+const FACE_OFFSET_DEG = 0; // tweak if the model needs an extra base turn to face the camera
+new GLTFLoader().load('assets/dog_lis2.glb', (gltf)=>{
   lisModel = gltf.scene;
   lisModel.updateMatrixWorld(true);
 
-  // The file is a full diorama: the actual character is a tight cluster of
-  // meshes right at the origin, surrounded by scattered decoration (bushes,
-  // snow clumps, a huge ground plane) placed further out. Keep only the
-  // tight cluster (the dog itself) and hide everything else.
-  const CHAR_RADIUS = 0.7;
-  const CHAR_MAX_DIM = 4;
-  const box = new THREE.Box3();
-  let found = false;
-  const byName = {};
-  lisModel.traverse(o=>{
-    if(o.isMesh){
-      const b = new THREE.Box3().setFromObject(o);
-      const c = b.getCenter(new THREE.Vector3());
-      const s = b.getSize(new THREE.Vector3());
-      const r = Math.sqrt(c.x*c.x + c.z*c.z);
-      const maxDim = Math.max(s.x, s.y, s.z);
-      if(r > CHAR_RADIUS || maxDim > CHAR_MAX_DIM){
-        o.visible = false;
-      } else {
-        box.union(b);
-        found = true;
-        byName[o.name] = o;
-      }
-    }
-  });
-  if(!found) box.setFromObject(lisModel);
-
-  // Group the leg/arm meshes under pivots at their joints so we can swing
-  // them for a walk cycle (the model has no skeleton/animations at all).
-  function makePivot(names, jointPos){
-    const pivot = new THREE.Object3D();
-    pivot.position.copy(jointPos);
-    lisModel.add(pivot);
-    names.forEach(n=>{ if(byName[n]) pivot.attach(byName[n]); });
-    return pivot;
-  }
-  limbPivots.legL = makePivot(['mesh_0','mesh_1','mesh_2','mesh_3'], new THREE.Vector3(-0.21, 1.2, 0.05));
-  limbPivots.legR = makePivot(['mesh_4','mesh_5','mesh_6','mesh_7'], new THREE.Vector3(0.21, 1.2, 0.05));
-  limbPivots.armL = makePivot(['mesh_11','mesh_12'], new THREE.Vector3(-0.42, 2.35, 0.2));
-  limbPivots.armR = makePivot(['mesh_13','mesh_14'], new THREE.Vector3(0.42, 2.35, 0.2));
-
+  const box = new THREE.Box3().setFromObject(lisModel);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z) || 1;
@@ -1019,6 +979,9 @@ function resizeCanvas(){
 window.addEventListener('resize', resizeCanvas);
 if(window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(canvas);
 
+// The model is a single static mesh (no skeleton/animation track), so the
+// "walking" gait is approximated on the whole body: a bounce + waddle tilt
+// synced to travel, like a real quadruped's up-down/side-to-side gait.
 let bobPhase = 0;
 let walkPhase = 0;
 let lastX = null;
@@ -1030,23 +993,20 @@ function animate(){
   if(canvas.clientWidth !== canvas.width || canvas.clientHeight !== canvas.height) resizeCanvas();
 
   // Face the camera by default; rotY only tweaks the turn toward travel direction.
-  lisModel.rotation.y = THREE.MathUtils.degToRad(-st.rotY);
+  lisModel.rotation.y = THREE.MathUtils.degToRad(FACE_OFFSET_DEG - st.rotY);
   lisModel.position.z = (st.depth - 1) * 1.4;
 
   const moving = lastX !== null && Math.abs(st.x - lastX) > 0.15;
   lastX = st.x;
-  const walkSpeed = moving ? 0.22 : 0.05;
-  const swingAmp = moving ? 0.55 : 0.06;
+  const walkSpeed = moving ? 0.35 : 0.05;
+  const bounceAmp = moving ? 0.09 : 0.03;
+  const waddleAmp = moving ? 0.09 : 0.015;
   walkPhase += walkSpeed;
   bobPhase += 0.06;
 
-  const swing = Math.sin(walkPhase) * swingAmp;
-  if(limbPivots.legL) limbPivots.legL.rotation.x = swing;
-  if(limbPivots.legR) limbPivots.legR.rotation.x = -swing;
-  if(limbPivots.armL) limbPivots.armL.rotation.x = -swing;
-  if(limbPivots.armR) limbPivots.armR.rotation.x = swing;
+  lisModel.position.y = modelBaseY + Math.abs(Math.sin(walkPhase)) * bounceAmp + Math.sin(bobPhase) * 0.02;
+  lisModel.rotation.z = Math.sin(walkPhase) * waddleAmp;
 
-  lisModel.position.y = modelBaseY + Math.sin(bobPhase) * 0.03;
   renderer.render(scene, camera);
 }
 animate();
