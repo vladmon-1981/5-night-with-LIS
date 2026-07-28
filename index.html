@@ -72,7 +72,7 @@
   #computerBg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:brightness(.8); }
   #camScreenOverlay { position:absolute; left:20.5%; top:6.5%; width:52.5%; height:58.5%; overflow:hidden; background:#000; box-shadow:0 0 24px 6px rgba(0,0,0,.85) inset, 0 0 12px 2px rgba(0,255,120,.15); border-radius:2px; perspective:500px; }
   #camScreenOverlay img#camMainImg { width:100%; height:100%; object-fit:cover; filter:grayscale(.4) brightness(.5) contrast(1.2); }
-  #camLisCanvas { position:absolute; width:20%; aspect-ratio:2/3; transition:left 1.3s ease, top 1.3s ease; filter:brightness(.75) drop-shadow(0 0 8px red); pointer-events:none; display:none; }
+  #camLisCanvas { position:absolute; width:20%; aspect-ratio:2/3; transition:left 2.6s linear, top 2.6s linear; filter:brightness(.75) drop-shadow(0 0 8px red); pointer-events:none; display:none; }
   #camStatic { position:absolute; inset:0; background:repeating-linear-gradient(0deg,#0002,#0002 2px,transparent 2px,transparent 4px); pointer-events:none; }
   #camLabel { position:absolute; top:6px; left:6px; color:#0f0; font-size:.7em; background:rgba(0,0,0,.5); padding:3px 7px; }
   #camLisWarn { position:absolute; bottom:6px; left:6px; color:#f55; font-size:.65em; display:none;}
@@ -267,6 +267,7 @@
 <script>
 /* ================= CONFIG ================= */
 const TOTAL_NIGHTS = 5;
+const WALK_TRANSITION_MS = 2600; // how long Lis's walk-across animation should keep playing
 const REAL_SECONDS_PER_NIGHT = 90; // real seconds to go from 00:00 to 06:00
 const nightDifficulty = n => ({
   lisMoveInterval: Math.max(3.5, 9 - n*1.1),      // seconds between Lis approach checks
@@ -645,17 +646,17 @@ function exitCamerasInstant(){
 }
 
 const CAMS = [
-  { id:'corridor',   img:'corridor.jpg' },
   { id:'pipes',      img:'pipes.jpg' },
-  { id:'yard',       img:'yard.jpg' },
+  { id:'kitchen',    img:'kitchen.jpg' },
+  { id:'corridor',   img:'corridor.jpg' },
   { id:'backdoor',   img:'backdoor.jpg' },
   { id:'sidepath',   img:'sidepath.jpg' },
-  { id:'houseview',  img:'houseview.jpg' },
   { id:'gardenpath', img:'gardenpath.jpg' },
   { id:'terrace',    img:'terrace.jpg' },
   { id:'mudroom',    img:'mudroom.jpg' },
   { id:'fireplace',  img:'fireplace.jpg' },
   { id:'hallway',    img:'hallway.jpg' },
+  { id:'hallway2',   img:'hallway2.jpg' },
 ];
 const camLabels = {};
 CAMS.forEach((c,i)=>{ camLabels[c.id] = 'CAM' + (i+1); });
@@ -702,9 +703,17 @@ const WANDER_LOCATIONS = CAMS.map(c=>c.id);
 function lisWanderTick(){
   if(!state || state.ended || state.energy<=0) return;
   if(state.lisLocation === 'door') return; // busy threatening the door, don't wander
-  const next = WANDER_LOCATIONS[Math.floor(Math.random()*WANDER_LOCATIONS.length)];
-  state.lisLocation = next;
-  state.lisPos = { x: 15 + Math.random()*65, y: 30 + Math.random()*45 };
+  // Mostly keep walking across the SAME camera (left<->right), only
+  // occasionally relocating to a different one — so Lis is seen actually
+  // walking through a shot instead of teleporting/flashing in and out.
+  const stayHere = CAMS.some(c=>c.id===state.lisLocation) && Math.random() < 0.7;
+  state.lisLocation = stayHere ? state.lisLocation : WANDER_LOCATIONS[Math.floor(Math.random()*WANDER_LOCATIONS.length)];
+  const prevX = state.lisPos ? state.lisPos.x : 50;
+  const goingRight = !stayHere ? Math.random() < 0.5 : prevX < 50;
+  state.lisPos = {
+    x: goingRight ? 74 + Math.random()*14 : 12 + Math.random()*14,
+    y: 30 + Math.random()*45
+  };
   updateLisVisual();
 }
 
@@ -752,8 +761,18 @@ function updateLisVisual(){
       window.lis3D.visible = showMain;
       window.lis3D.x = state.lisPos.x;
       window.lis3D.y = state.lisPos.y;
-      window.lis3D.rotY = state.lastRotY || 0;
       window.lis3D.depth = state.lastDepth || 1;
+      // A wider turn range than the flat CSS/grid marks use, so the model
+      // visibly turns sideways while it walks across the shot.
+      const prev3D = state.lis3DPrevX !== undefined ? state.lis3DPrevX : state.lisPos.x;
+      const dx3D = state.lisPos.x - prev3D;
+      let rot3D = Math.max(-75, Math.min(75, -dx3D * 6));
+      if(Math.abs(dx3D) < 0.5) rot3D *= 0.1;
+      state.lis3DPrevX = state.lisPos.x;
+      window.lis3D.rotY = rot3D;
+      if(showMain && Math.abs(dx3D) >= 0.5){
+        window.lis3D.movingUntil = performance.now() + WALK_TRANSITION_MS;
+      }
     }
   }
   const doneCount = state.trayPies ? state.trayPies.filter(s=>s==='done').length : 0;
@@ -930,7 +949,7 @@ renderNights();
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-window.lis3D = { visible:false, x:50, y:50, rotY:0, depth:1 };
+window.lis3D = { visible:false, x:50, y:50, rotY:0, depth:1, movingUntil:0 };
 
 const canvas = document.getElementById('camLisCanvas');
 const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
@@ -982,22 +1001,25 @@ if(window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(canvas);
 // The model is a single static mesh (no skeleton/animation track), so the
 // "walking" gait is approximated on the whole body: a bounce + waddle tilt
 // synced to travel, like a real quadruped's up-down/side-to-side gait.
+// `movingUntil` (a timestamp, set whenever Lis picks a new spot to walk to)
+// keeps the gait playing for the *entire* multi-second crossing — not just
+// the single frame where the target position changed.
 let bobPhase = 0;
 let walkPhase = 0;
-let lastX = null;
+let curRotY = 0;
 function animate(){
   requestAnimationFrame(animate);
   if(!lisModel) return;
   const st = window.lis3D;
-  if(!st.visible){ lastX = null; return; }
+  if(!st.visible) return;
   if(canvas.clientWidth !== canvas.width || canvas.clientHeight !== canvas.height) resizeCanvas();
 
-  // Face the camera by default; rotY only tweaks the turn toward travel direction.
-  lisModel.rotation.y = THREE.MathUtils.degToRad(FACE_OFFSET_DEG - st.rotY);
+  // Ease toward the target turn instead of snapping, so the turn itself reads as motion.
+  curRotY += (st.rotY - curRotY) * 0.06;
+  lisModel.rotation.y = THREE.MathUtils.degToRad(FACE_OFFSET_DEG - curRotY);
   lisModel.position.z = (st.depth - 1) * 1.4;
 
-  const moving = lastX !== null && Math.abs(st.x - lastX) > 0.15;
-  lastX = st.x;
+  const moving = performance.now() < st.movingUntil;
   const walkSpeed = moving ? 0.35 : 0.05;
   const bounceAmp = moving ? 0.09 : 0.03;
   const waddleAmp = moving ? 0.09 : 0.015;
