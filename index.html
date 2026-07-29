@@ -93,8 +93,9 @@
   .camThumb .camNumTag { position:absolute; top:1px; left:1px; color:#0f0; font-size:.55em; background:rgba(0,0,0,.6); padding:1px 3px; }
   .camThumb .camDownIcon { position:absolute; top:1px; right:1px; font-size:.65em; transform:rotate(180deg); filter:drop-shadow(0 0 2px #000); }
   .camThumb.selected { border-color:#0f0; opacity:1; }
-  .thumbLisMark { position:absolute; width:22%; aspect-ratio:1; transition:left 2s linear, top 2s linear; display:none; transform:translate(-50%,-50%); }
-  .thumbLisMark .gridLisDot { animation:gridPulse .7s infinite; }
+  .thumbLisMark { position:absolute; width:34%; aspect-ratio:1; transition:left 2.6s linear, top 2.6s linear; display:none; }
+  .thumbLisFigure { display:block; width:100%; height:100%; transform:translate(-50%,-50%) scaleX(var(--flip,1)); font-size:1.1em; line-height:1; text-align:center; filter:drop-shadow(0 0 3px red) drop-shadow(0 0 1px #000); animation:thumbWalk .45s ease-in-out infinite; }
+  @keyframes thumbWalk { 0%,100%{ margin-top:0; } 50%{ margin-top:-2px; } }
   #gridToggleBtn { background:#300; border:1px solid #a00; color:#eee; padding:8px 14px; cursor:pointer; font-family:inherit; margin-left:10px; }
   #gridToggleBtn.active { background:#030; border-color:#0a0; }
   #exitCamBtn { position:absolute; top:10px; right:10px; z-index:9; background:#300; border:2px solid #a00; color:#eee; padding:8px 16px; cursor:pointer; font-family:inherit;}
@@ -111,10 +112,13 @@
   @keyframes pulse { 50%{opacity:.6;} }
   #kitchenPanel button { background:#300; border:1px solid #a00; color:#eee; padding:8px 14px; margin:4px; cursor:pointer; font-family:inherit;}
   #kitchenPanel button:disabled { opacity:.35; cursor:not-allowed; }
-  #bakeProgressWrap { width:100%; height:8px; background:#222; margin-top:8px; display:none; position:relative; }
+  #bakeProgressWrap { width:100%; height:8px; background:#222; margin-top:8px; display:none; position:relative; overflow:visible; }
   #bakeProgress { height:100%; background:#fc5; width:0%; }
   #ovenFlame { position:absolute; right:-4px; top:-14px; font-size:1.2em; display:none; animation:pulse .4s infinite; }
   #bakeProgressWrap.baking #ovenFlame { display:inline-block; }
+  #ovenSlideAnim { position:absolute; left:-30px; top:-16px; font-size:1.3em; opacity:0; pointer-events:none; }
+  #ovenSlideAnim.play { animation:slideIntoOven 1s ease-in forwards; }
+  @keyframes slideIntoOven { 0%{ left:-30px; opacity:1; transform:scale(1) rotate(0deg);} 75%{ left:78%; opacity:1; transform:scale(.6) rotate(200deg);} 100%{ left:82%; opacity:0; transform:scale(.3) rotate(260deg);} }
 
   #rollAnimWrap { display:none; align-items:center; justify-content:center; gap:6px; margin:8px 0; height:36px; position:relative; }
   #rollAnimWrap.active { display:flex; }
@@ -124,6 +128,14 @@
   #pinEmoji .pinBody { width:44px; height:14px; background:#e8c99a; border:1px solid #b8895a; border-radius:6px; margin:0 -2px; }
   @keyframes rollPin { 0%,100%{ transform:translateX(-16px) rotate(-10deg);} 50%{ transform:translateX(16px) rotate(10deg);} }
   @keyframes flattenDough { 0%,100%{ transform:scaleX(1) scaleY(1);} 50%{ transform:scaleX(1.25) scaleY(.8);} }
+
+  #flourSprinkle { position:absolute; top:-16px; left:50%; transform:translateX(-50%); display:flex; gap:8px; pointer-events:none; }
+  #flourSprinkle span { width:5px; height:5px; background:#fff8dc; border-radius:50%; opacity:0; box-shadow:0 0 3px 1px rgba(255,248,220,.7); animation:flourFall .7s linear infinite; }
+  #flourSprinkle span:nth-child(1){ animation-delay:0s; }
+  #flourSprinkle span:nth-child(2){ animation-delay:.15s; }
+  #flourSprinkle span:nth-child(3){ animation-delay:.3s; }
+  #flourSprinkle span:nth-child(4){ animation-delay:.45s; }
+  @keyframes flourFall { 0%{ transform:translateY(0); opacity:1;} 100%{ transform:translateY(46px); opacity:0;} }
 
   #camFeedBtn { position:absolute; bottom:8px; right:8px; z-index:6; background:#300; border:2px solid #a00; color:#eee; padding:6px 12px; cursor:pointer; font-family:inherit; font-size:.75em; display:none; }
   #camFeedBtn.show { display:block; }
@@ -205,10 +217,15 @@
         <h3>🥧 КУХНЯ — пирожки (успокаивают Лиса)</h3>
         <div class="traySlots" id="traySlots"></div>
         <button id="shapeBtn" onclick="shapePie()">Слепить пирожок (2с)</button>
-        <div id="rollAnimWrap"><span id="doughEmoji">🥟</span><span id="pinEmoji"><span class="pinHandle"></span><span class="pinBody"></span><span class="pinHandle"></span></span></div>
+        <div id="rollAnimWrap">
+          <div id="flourSprinkle"><span></span><span></span><span></span><span></span></div>
+          <span id="doughEmoji">🥟</span><span id="pinEmoji"><span class="pinHandle"></span><span class="pinBody"></span><span class="pinHandle"></span></span>
+        </div>
         <button id="bakeBtn" onclick="startBaking()" disabled>Поставить в духовку</button>
-        <div id="bakeProgressWrap"><div id="bakeProgress"></div><span id="ovenFlame">🔥</span></div>
-        <button id="feedBtn" onclick="feedLis()" disabled>Покормить Лиса</button>
+        <div id="bakeProgressWrap">
+          <span id="ovenSlideAnim">🥧</span>
+          <div id="bakeProgress"></div><span id="ovenFlame">🔥</span>
+        </div>
       </div>
 
       <div id="navBar">
@@ -235,7 +252,6 @@
       </div>
       <div id="camThumbs">
         <div id="camThumbList"></div>
-        <button id="gridToggleBtn" onclick="toggleCamGrid()">▼ ВСЕ КАМЕРЫ</button>
       </div>
     </div>
   </div>
@@ -402,9 +418,9 @@ function startNight(n){
     diff,
     facing: 'corridor', // corridor | kitchen (via double tap)
     inCamera: false,
-    currentCam: 'corridor',
+    currentCam: 'backdoor',
     doorClosed: false,
-    lisLocation: 'corridor', // corridor -> door -> (in)
+    lisLocation: 'backdoor', // backdoor -> door -> (in)
     lisAtDoorTimer: null,
     lisApproaching: false,
     energy: 100,
@@ -438,7 +454,6 @@ function startNight(n){
   document.getElementById('rollAnimWrap').classList.remove('active');
   document.getElementById('camGridOverlay').style.display = 'none';
   document.getElementById('camScreenOverlay').style.display = 'block';
-  document.getElementById('gridToggleBtn').classList.remove('active');
   exitCamerasInstant();
   renderTray();
   updateEnergyBar();
@@ -513,17 +528,17 @@ function lisBehaviorTick(){
   const roll = Math.random();
   const hungerBoost = state.hunger >= 85 ? 0.25 : (state.hunger >= 60 ? 0.1 : 0);
   const effectiveChance = state.diff.approachChance + hungerBoost;
-  if(state.lisLocation === 'corridor' && roll < effectiveChance){
+  if(state.lisLocation === 'backdoor' && roll < effectiveChance){
     state.lisApproaching = true;
     state.lisLocation = 'door';
     state.lisPos = { x: 45 + Math.random()*10, y: 50 + Math.random()*10 };
     document.getElementById('doorStatus').textContent = 'Лис приближается к двери!';
     document.getElementById('doorStatus').classList.add('danger');
-    if(state.currentCam==='corridor') showCamLisWarn(true);
+    if(state.currentCam==='backdoor') showCamLisWarn(true);
     updateLisVisual();
     if(state.doorClosed){
       // safe, he retreats after a bit
-      after(()=>{ if(state && state.lisLocation==='door'){ state.lisLocation='corridor'; state.lisApproaching=false; resetDoorStatus(); showCamLisWarn(false); updateLisVisual();} }, 3000);
+      after(()=>{ if(state && state.lisLocation==='door'){ state.lisLocation='backdoor'; state.lisApproaching=false; resetDoorStatus(); showCamLisWarn(false); updateLisVisual();} }, 3000);
     } else {
       sfxAlarm();
       if(state.alarmInterval) clearInterval(state.alarmInterval);
@@ -534,7 +549,7 @@ function lisBehaviorTick(){
         }
       }, state.diff.doorGraceTime*1000);
     }
-  } else if(state.lisLocation==='corridor'){
+  } else if(state.lisLocation==='backdoor'){
     // wanders, maybe visits kitchen briefly - purely cosmetic for camera flavor
   }
 }
@@ -557,7 +572,7 @@ function toggleDoor(){
     if(state.lisAtDoorTimer) clearTimeout(state.lisAtDoorTimer);
     if(state.alarmInterval){ clearInterval(state.alarmInterval); state.alarmInterval=null; }
     document.getElementById('doorStatus').textContent = 'Дверь закрыта — Лис снаружи';
-    after(()=>{ if(state && state.lisLocation==='door'){ state.lisLocation='corridor'; state.lisApproaching=false; resetDoorStatus(); showCamLisWarn(false); updateLisVisual();} }, 3000);
+    after(()=>{ if(state && state.lisLocation==='door'){ state.lisLocation='backdoor'; state.lisApproaching=false; resetDoorStatus(); showCamLisWarn(false); updateLisVisual();} }, 3000);
   }
 }
 
@@ -653,8 +668,6 @@ function exitCamerasInstant(){
 
 const CAMS = [
   { id:'pipes',      img:'pipes.jpg' },
-  { id:'kitchen',    img:'kitchen.jpg' },
-  { id:'corridor',   img:'corridor.jpg' },
   { id:'backdoor',   img:'backdoor.jpg' },
   { id:'sidepath',   img:'sidepath.jpg' },
   { id:'gardenpath', img:'gardenpath.jpg' },
@@ -678,7 +691,7 @@ function buildCamUI(){
     thumb.className = 'camThumb';
     thumb.dataset.cam = c.id;
     thumb.onclick = ()=>selectCam(c.id);
-    thumb.innerHTML = `<img src="assets/${c.img}"><span class="camNumTag">CAM${num}</span><span class="camDownIcon">📹</span><div class="thumbLisMark"><div class="gridLisDot"></div></div>`;
+    thumb.innerHTML = `<img src="assets/${c.img}"><span class="camNumTag">CAM${num}</span><span class="camDownIcon">📹</span><div class="thumbLisMark"><span class="thumbLisFigure">🦊</span></div>`;
     thumbList.appendChild(thumb);
 
     const cell = document.createElement('div');
@@ -696,7 +709,7 @@ function selectCam(cam){
   document.querySelectorAll('.camThumb').forEach(t=>t.classList.toggle('selected', t.dataset.cam===cam));
   document.getElementById('camMainImg').src = 'assets/'+CAMS.find(c=>c.id===cam).img;
   document.getElementById('camLabel').textContent = camLabels[cam];
-  showCamLisWarn(cam==='corridor' && state.lisLocation==='door');
+  showCamLisWarn(cam==='backdoor' && state.lisLocation==='door');
   renderLeakOnCam();
   updateLisVisual();
 }
@@ -772,8 +785,14 @@ function lisPseudo3DTransform(pos){
 
 function updateLisVisual(){
   if(!state) return;
-  const effectiveLoc = state.lisLocation === 'door' ? 'corridor' : state.lisLocation;
+  const effectiveLoc = state.lisLocation === 'door' ? 'backdoor' : state.lisLocation;
   const transform = lisPseudo3DTransform(state.lisPos);
+  // Shared direction-of-travel tracking, used both by the 3D model's turn
+  // and by the small thumbnail figure's left/right flip, so they stay in sync.
+  const prev3D = state.lis3DPrevX !== undefined ? state.lis3DPrevX : state.lisPos.x;
+  const dx3D = state.lisPos.x - prev3D;
+  state.lis3DPrevX = state.lisPos.x;
+  if(Math.abs(dx3D) >= 0.5) state.lisFacingRight = dx3D > 0;
   if(state.camGridMode){
     document.querySelectorAll('.gridCell').forEach(cell=>{
       const cam = cell.dataset.cam;
@@ -802,11 +821,8 @@ function updateLisVisual(){
       window.lis3D.depth = state.lastDepth || 1;
       // A wider turn range than the flat CSS/grid marks use, so the model
       // visibly turns sideways while it walks across the shot.
-      const prev3D = state.lis3DPrevX !== undefined ? state.lis3DPrevX : state.lisPos.x;
-      const dx3D = state.lisPos.x - prev3D;
       let rot3D = Math.max(-75, Math.min(75, -dx3D * 6));
       if(Math.abs(dx3D) < 0.5) rot3D *= 0.1;
-      state.lis3DPrevX = state.lisPos.x;
       window.lis3D.rotY = rot3D;
       if(showMain && Math.abs(dx3D) >= 0.5){
         window.lis3D.movingUntil = performance.now() + WALK_TRANSITION_MS;
@@ -822,6 +838,7 @@ function updateLisVisual(){
       mark.style.display = 'block';
       mark.style.left = state.lisPos.x + '%';
       mark.style.top = state.lisPos.y + '%';
+      mark.style.setProperty('--flip', state.lisFacingRight ? '-1' : '1');
     } else {
       mark.style.display = 'none';
     }
@@ -831,21 +848,11 @@ function updateLisVisual(){
   document.getElementById('camFeedBtn').classList.toggle('show', showFeed);
 }
 
-function toggleCamGrid(){
-  if(!state) return;
-  sfxClick();
-  state.camGridMode = !state.camGridMode;
-  document.getElementById('camScreenOverlay').style.display = state.camGridMode ? 'none' : 'block';
-  document.getElementById('camGridOverlay').style.display = state.camGridMode ? 'grid' : 'none';
-  document.getElementById('gridToggleBtn').classList.toggle('active', state.camGridMode);
-  updateLisVisual();
-}
 function selectCamFromGrid(cam){
   if(!state) return;
   state.camGridMode = false;
   document.getElementById('camScreenOverlay').style.display = 'block';
   document.getElementById('camGridOverlay').style.display = 'none';
-  document.getElementById('gridToggleBtn').classList.remove('active');
   selectCam(cam);
 }
 
@@ -862,7 +869,6 @@ function renderTray(){
   const rawCount = state.trayPies.filter(s=>s==='raw').length;
   const doneCount = state.trayPies.filter(s=>s==='done').length;
   document.getElementById('bakeBtn').disabled = state.baking || rawCount===0;
-  document.getElementById('feedBtn').disabled = doneCount===0;
   document.getElementById('shapeBtn').disabled = state.shapingBusy || state.baking || state.trayPies.every(s=>s!=='empty');
   updateLisVisual();
 }
@@ -894,6 +900,10 @@ function startBaking(){
   const wrap = document.getElementById('bakeProgressWrap');
   wrap.style.display = 'block';
   wrap.classList.add('baking');
+  const slideEl = document.getElementById('ovenSlideAnim');
+  slideEl.classList.remove('play');
+  void slideEl.offsetWidth; // restart the animation
+  slideEl.classList.add('play');
   state.bakeProgress = 0;
   const bakeTime = 8000;
   const step = 200;
@@ -924,7 +934,7 @@ function feedLis(){
   state.hunger = Math.max(0, state.hunger - 40);
   updateHungerBar();
   if(state.lisLocation==='door'){
-    state.lisLocation = 'corridor';
+    state.lisLocation = 'backdoor';
     state.lisApproaching = false;
     if(state.lisAtDoorTimer) clearTimeout(state.lisAtDoorTimer);
     if(state.alarmInterval){ clearInterval(state.alarmInterval); state.alarmInterval=null; }
